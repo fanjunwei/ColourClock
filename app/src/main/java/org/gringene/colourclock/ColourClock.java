@@ -16,8 +16,16 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-public class ColourClock extends View {
+enum ClockViewType {
+    NORMAL,
+    SHI_CHEN,
+    JING_LUO,
+}
 
+public class ColourClock extends View implements View.OnClickListener {
+
+    private ClockViewType currentViewType = ClockViewType.NORMAL;
+    private static final String LOG_TAG = "clock view";
     private static final float OUTER_POS = 16;  // position of numbers in sixteenths of circle radius
     private static final float INNER_POS = 11;
     private static final float NUMBER_POS = (OUTER_POS + INNER_POS) / 2f;
@@ -28,7 +36,7 @@ public class ColourClock extends View {
     private static final float MIN_WIDTH = 0.25f;
     private static final float SEC_WIDTH = 0.125f;
     private final Paint brushes = new Paint(Paint.ANTI_ALIAS_FLAG);
-//    private Time mCalendar;
+    //    private Time mCalendar;
     private float mHours;
     private float mMinutes;
     private float mSeconds;
@@ -61,6 +69,7 @@ public class ColourClock extends View {
     private void init() {
         tickerTimer = new ScheduledThreadPoolExecutor(1);
         startTick();
+        this.setOnClickListener(this);
     }
 
     protected void updateTime() {
@@ -109,13 +118,50 @@ public class ColourClock extends View {
         brushes.setColor(Color.BLACK);
         brushes.setTextSize(bandWidth * 3);
         Rect b = new Rect();
-        for (int i = 1; i <= 12; i++) {
+        int tag_count;
+
+        if (this.currentViewType == ClockViewType.NORMAL) {
+            tag_count = 12;
+        } else {
+            tag_count = 6;
+        }
+        for (int i = 1; i <= tag_count; i++) {
             String is = Integer.toString(i);
             brushes.getTextBounds(is, 0, is.length(), b);
-            double angle = (i * 30 - 90) * (Math.PI / 180);
+            double angle;
+            if (this.currentViewType == ClockViewType.NORMAL) {
+                angle = (i * 30 - 90) * (Math.PI / 180);
+            } else {
+                angle = (i * 60 - 180) * (Math.PI / 180);
+            }
             double cx = centreX + Math.cos(angle) * bandWidth * ColourClock.NUMBER_POS;
             double cy = centreY + Math.sin(angle) * bandWidth * ColourClock.NUMBER_POS + b.height() / 2f;
-            tPainting.drawText(String.format(Locale.CHINA, "%d", i), (float) cx, (float) cy, brushes);
+            String text;
+            String[] tl;
+            switch (this.currentViewType) {
+                case NORMAL:
+                default:
+                    text = String.format(Locale.CHINA, "%d", i);
+                    break;
+                case SHI_CHEN:
+                    this.currentViewType = ClockViewType.JING_LUO;
+                    if (mHours < 12) {
+                        tl = new String[]{"子", "丑", "寅", "卯", "辰", "巳"};
+                    } else {
+                        tl = new String[]{"午", "未", "申", "酉", "戌", "亥"};
+                    }
+                    text = tl[i - 1];
+                    break;
+                case JING_LUO:
+                    if (mHours < 12) {
+                        tl = new String[]{"胆", "肝", "肺", "大肠", "胃", "脾"};
+                    } else {
+                        tl = new String[]{"心", "小肠", "膀胱", "肾", "心包", "亥三"};
+                    }
+                    text = tl[i - 1];
+                    break;
+            }
+            tPainting.drawText(text, (float) cx, (float) cy, brushes);
         }
         for (int i = 0; i < 60; i++) {
             double angle = (i * 6 - 90) * (Math.PI / 180);
@@ -233,6 +279,24 @@ public class ColourClock extends View {
             int refreshRate = 50;
             clockTicker = tickerTimer.scheduleWithFixedDelay(new ClockTicker(this),
                     0, refreshRate, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    @Override
+    public void onClick(View view) {
+        switch (this.currentViewType) {
+            case NORMAL:
+                this.currentViewType = ClockViewType.SHI_CHEN;
+                this.invalidate();
+                break;
+            case SHI_CHEN:
+                this.currentViewType = ClockViewType.JING_LUO;
+                this.invalidate();
+                break;
+            case JING_LUO:
+                this.currentViewType = ClockViewType.NORMAL;
+                this.invalidate();
+                break;
         }
     }
 }

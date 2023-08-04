@@ -5,7 +5,7 @@ import android.app.Activity;
 import android.util.Log;
 
 public class ClockActivity extends Activity {
-
+    final String LOG_TAG = "colourclock";
     ColourClock mClock;
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -16,14 +16,14 @@ public class ClockActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        Log.d("org.gringene.colourclock", "Resuming...");
+        Log.d(LOG_TAG, "Resuming...");
         mClock.startTick();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        Log.d("org.gringene.colourclock", "Pausing...");
+        Log.d(LOG_TAG, "Pausing...");
         mClock.stopTick();
     }
 }

@@ -15,6 +15,7 @@ import java.util.Locale;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 enum ClockViewType {
     NORMAL,
@@ -22,8 +23,11 @@ enum ClockViewType {
     JING_LUO,
 }
 
-public class ColourClock extends View implements View.OnClickListener {
+public class ColourClock extends View implements View.OnClickListener, Runnable {
 
+    private ReentrantLock drawLock = new ReentrantLock();
+    private boolean dryLock = false;
+    private ReentrantLock drawStateLock = new ReentrantLock();
     private ClockViewType currentViewType = ClockViewType.NORMAL;
     private static final String LOG_TAG = "clock view";
     private static final float OUTER_POS = 16;  // position of numbers in sixteenths of circle radius
@@ -48,7 +52,6 @@ public class ColourClock extends View implements View.OnClickListener {
     private Bitmap backing;
     private Canvas painting;
     boolean ticking = false;
-    boolean isDrawing = false;
 
     private ScheduledThreadPoolExecutor tickerTimer;
     ScheduledFuture<?> clockTicker = null;
@@ -86,8 +89,7 @@ public class ColourClock extends View implements View.OnClickListener {
         mMinutes = (float) Math.floor(mMinutes); // now that the Hour is done, ensure minutes jump
         //Log.d("org.gringene.colourclock",String.format("Updating time, now %02d:%02d:%02.2f", hour, min, mSeconds));
         if (started) {
-            drawClock(painting);
-            this.postInvalidate();
+            drawClock();
         }
     }
 
@@ -116,23 +118,24 @@ public class ColourClock extends View implements View.OnClickListener {
     public void drawNumbers(Canvas tPainting) {
         brushes.setStyle(Paint.Style.FILL);
         brushes.setColor(Color.BLACK);
-        brushes.setTextSize(bandWidth * 3);
         Rect b = new Rect();
         int tag_count;
 
         if (this.currentViewType == ClockViewType.NORMAL) {
             tag_count = 12;
+            brushes.setTextSize(bandWidth * 3);
         } else {
             tag_count = 6;
+            brushes.setTextSize(bandWidth * 2);
         }
-        for (int i = 1; i <= tag_count; i++) {
+        for (int i = 0; i < tag_count; i++) {
             String is = Integer.toString(i);
             brushes.getTextBounds(is, 0, is.length(), b);
             double angle;
             if (this.currentViewType == ClockViewType.NORMAL) {
                 angle = (i * 30 - 90) * (Math.PI / 180);
             } else {
-                angle = (i * 60 - 180) * (Math.PI / 180);
+                angle = (i * 60 - 120) * (Math.PI / 180);
             }
             double cx = centreX + Math.cos(angle) * bandWidth * ColourClock.NUMBER_POS;
             double cy = centreY + Math.sin(angle) * bandWidth * ColourClock.NUMBER_POS + b.height() / 2f;
@@ -141,24 +144,23 @@ public class ColourClock extends View implements View.OnClickListener {
             switch (this.currentViewType) {
                 case NORMAL:
                 default:
-                    text = String.format(Locale.CHINA, "%d", i);
+                    text = String.format(Locale.CHINA, "%d", i == 0 ? 12 : i);
                     break;
                 case SHI_CHEN:
-                    this.currentViewType = ClockViewType.JING_LUO;
                     if (mHours < 12) {
                         tl = new String[]{"子", "丑", "寅", "卯", "辰", "巳"};
                     } else {
                         tl = new String[]{"午", "未", "申", "酉", "戌", "亥"};
                     }
-                    text = tl[i - 1];
+                    text = tl[i];
                     break;
                 case JING_LUO:
                     if (mHours < 12) {
                         tl = new String[]{"胆", "肝", "肺", "大肠", "胃", "脾"};
                     } else {
-                        tl = new String[]{"心", "小肠", "膀胱", "肾", "心包", "亥三"};
+                        tl = new String[]{"心", "小肠", "膀胱", "肾", "心包", "三焦"};
                     }
-                    text = tl[i - 1];
+                    text = tl[i];
                     break;
             }
             tPainting.drawText(text, (float) cx, (float) cy, brushes);
@@ -180,27 +182,44 @@ public class ColourClock extends View implements View.OnClickListener {
         }
     }
 
-    public void drawClock(Canvas tPainting) {
-        isDrawing = true;
-        float hourAng = (mHours * 30); // 360/12
-        float minAng = (mMinutes * 6); // 360/60
-        float secAng = (mSeconds * 6); // 360/60
-        //tPainting.drawColor(Color.WHITE); // fill in background
-        brushes.setStyle(Paint.Style.STROKE);
-        drawCircle(ColourClock.OUTER_POS, 0.125f, Color.WHITE, Color.BLACK, tPainting); // outer face
-        drawCircle(ColourClock.INNER_POS, 0.125f, Color.WHITE, Color.BLACK, tPainting); // inner face
-        drawNumbers(tPainting);
-        brushes.setStyle(Paint.Style.STROKE);
-        drawLine(hourAng, ColourClock.HOUR_POS, ColourClock.HOUR_WIDTH, tPainting); // hour hand
-        drawCircle(hourAng, ColourClock.HOUR_POS - 2, 1.5f, ColourClock.HOUR_WIDTH, getAngleColour(hourAng), Color.BLACK, tPainting); // hour circle
-        drawLine(minAng, ColourClock.MIN_POS, ColourClock.MIN_WIDTH, tPainting); // minute hand
-        drawCircle(minAng, ColourClock.MIN_POS - 1.25f, 1f, ColourClock.MIN_WIDTH, getAngleColour(minAng), Color.BLACK, tPainting); // minute circle
-        drawLine(secAng, ColourClock.SEC_POS, ColourClock.SEC_WIDTH, tPainting); // second hand
-        drawCircle(secAng, ColourClock.SEC_POS - 0.75f, 0.5f, ColourClock.SEC_WIDTH, getAngleColour(secAng), Color.BLACK, tPainting); // second circle
-        drawCircle(2, 0.5f, Color.WHITE, Color.BLACK, tPainting); // centre dot
-        brushes.setStrokeWidth(1);
-        brushes.setStyle(Paint.Style.FILL);
-        isDrawing = false;
+    public void drawClock() {
+        if (!this.drawLock.tryLock()) {
+            this.drawStateLock.lock();
+            this.dryLock = true;
+            this.drawStateLock.unlock();
+            return;
+        }
+        try {
+            float hourAng = (mHours * 30); // 360/12
+            float minAng = (mMinutes * 6); // 360/60
+            float secAng = (mSeconds * 6); // 360/60
+            this.painting.drawColor(Color.WHITE); // fill in background
+            brushes.setStyle(Paint.Style.STROKE);
+            drawCircle(ColourClock.OUTER_POS, 0.125f, Color.WHITE, Color.BLACK, this.painting); // outer face
+            drawCircle(ColourClock.INNER_POS, 0.125f, Color.WHITE, Color.BLACK, this.painting); // inner face
+            drawNumbers(this.painting);
+            brushes.setStyle(Paint.Style.STROKE);
+            drawLine(hourAng, ColourClock.HOUR_POS, ColourClock.HOUR_WIDTH, this.painting); // hour hand
+            drawCircle(hourAng, ColourClock.HOUR_POS - 2, 1.5f, ColourClock.HOUR_WIDTH, getAngleColour(hourAng), Color.BLACK, this.painting); // hour circle
+            drawLine(minAng, ColourClock.MIN_POS, ColourClock.MIN_WIDTH, this.painting); // minute hand
+            drawCircle(minAng, ColourClock.MIN_POS - 1.25f, 1f, ColourClock.MIN_WIDTH, getAngleColour(minAng), Color.BLACK, this.painting); // minute circle
+            drawLine(secAng, ColourClock.SEC_POS, ColourClock.SEC_WIDTH, this.painting); // second hand
+            drawCircle(secAng, ColourClock.SEC_POS - 0.75f, 0.5f, ColourClock.SEC_WIDTH, getAngleColour(secAng), Color.BLACK, this.painting); // second circle
+            drawCircle(2, 0.5f, Color.WHITE, Color.BLACK, this.painting); // centre dot
+            brushes.setStrokeWidth(1);
+            brushes.setStyle(Paint.Style.FILL);
+
+        } finally {
+            this.drawLock.unlock();
+            this.postInvalidate();
+        }
+        this.drawStateLock.lock();
+        if (this.dryLock) {
+            Thread t = new Thread(this);
+            t.start();
+        }
+        this.dryLock = false;
+        this.drawStateLock.unlock();
     }
 
     private void drawCircle(float radiusFactor, float strokeWFactor,
@@ -241,10 +260,14 @@ public class ColourClock extends View implements View.OnClickListener {
     @Override
     public void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (!isDrawing) {
-            canvas.drawBitmap(backing, 0, 0, null);
-        } else {
+        if (!this.drawLock.tryLock()) {
             this.invalidate();
+            return;
+        }
+        try {
+            canvas.drawBitmap(backing, 0, 0, null);
+        } finally {
+            this.drawLock.unlock();
         }
     }
 
@@ -277,7 +300,7 @@ public class ColourClock extends View implements View.OnClickListener {
         if (!ticking) {
             ticking = true;
             int refreshRate = 50;
-            clockTicker = tickerTimer.scheduleWithFixedDelay(new ClockTicker(this),
+            clockTicker = tickerTimer.scheduleWithFixedDelay(this,
                     0, refreshRate, TimeUnit.MILLISECONDS);
         }
     }
@@ -287,16 +310,20 @@ public class ColourClock extends View implements View.OnClickListener {
         switch (this.currentViewType) {
             case NORMAL:
                 this.currentViewType = ClockViewType.SHI_CHEN;
-                this.invalidate();
                 break;
             case SHI_CHEN:
                 this.currentViewType = ClockViewType.JING_LUO;
-                this.invalidate();
                 break;
             case JING_LUO:
                 this.currentViewType = ClockViewType.NORMAL;
-                this.invalidate();
                 break;
         }
+        Thread t = new Thread(this);
+        t.start();
+    }
+
+    @Override
+    public void run() {
+        this.updateTime();
     }
 }

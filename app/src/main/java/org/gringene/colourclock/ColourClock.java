@@ -8,13 +8,11 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import java.util.Calendar;
 import java.util.Locale;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 enum ClockViewType {
@@ -25,11 +23,12 @@ enum ClockViewType {
 
 public class ColourClock extends View implements View.OnClickListener, Runnable {
 
-    private ReentrantLock drawLock = new ReentrantLock();
+    private final ReentrantLock drawLock = new ReentrantLock();
+    private boolean onDraw = false;
     private boolean dryLock = false;
-    private ReentrantLock drawStateLock = new ReentrantLock();
+    private final ReentrantLock drawStateLock = new ReentrantLock();
     private ClockViewType currentViewType = ClockViewType.NORMAL;
-    private static final String LOG_TAG = "clock view";
+    private static final String LOG_TAG = "clock_view";
     private static final float OUTER_POS = 16;  // position of numbers in sixteenths of circle radius
     private static final float INNER_POS = 11;
     private static final float NUMBER_POS = (OUTER_POS + INNER_POS) / 2f;
@@ -51,10 +50,9 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
 
     private Bitmap backing;
     private Canvas painting;
-    boolean ticking = false;
 
-    private ScheduledThreadPoolExecutor tickerTimer;
-    ScheduledFuture<?> clockTicker = null;
+    private boolean running = false;
+    private Thread loopThread = null;
 
 
     private boolean started = false;
@@ -70,12 +68,12 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     }
 
     private void init() {
-        tickerTimer = new ScheduledThreadPoolExecutor(1);
         startTick();
         this.setOnClickListener(this);
     }
 
     protected void updateTime() {
+        Log.d(LOG_TAG, "updateTime");
         Calendar calendar = Calendar.getInstance();
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
         int min = calendar.get(Calendar.MINUTE);
@@ -190,6 +188,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             return;
         }
         try {
+            onDraw = true;
             float hourAng = (mHours * 30); // 360/12
             float minAng = (mMinutes * 6); // 360/60
             float secAng = (mSeconds * 6); // 360/60
@@ -210,6 +209,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             brushes.setStyle(Paint.Style.FILL);
 
         } finally {
+            onDraw = false;
             this.drawLock.unlock();
             this.postInvalidate();
         }
@@ -265,7 +265,11 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             return;
         }
         try {
-            canvas.drawBitmap(backing, 0, 0, null);
+            if (!onDraw) {
+                canvas.drawBitmap(backing, 0, 0, null);
+            } else {
+                this.invalidate();
+            }
         } finally {
             this.drawLock.unlock();
         }
@@ -283,26 +287,51 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         brushes.setColor(Color.BLACK);
         brushes.setTextAlign(Paint.Align.CENTER);
         brushes.setStrokeCap(Paint.Cap.ROUND);
-        updateTime();
+        Thread t = new Thread(this);
+        t.start();
     }
 
     public void stopTick() {
         /* try to remove all traces of the update threads and stop them from running */
-        ticking = false;
-        clockTicker.cancel(true);
-        for (Runnable t : tickerTimer.getQueue()) {
-            tickerTimer.remove(t);
-        }
-        clockTicker = null;
+        Log.d(LOG_TAG, "stopTick");
+        running = false;
+//        clockTicker.cancel(true);
+//        for (Runnable t : tickerTimer.getQueue()) {
+//            tickerTimer.remove(t);
+//        }
+//        clockTicker = null;
     }
 
     public void startTick() {
-        if (!ticking) {
-            ticking = true;
-            int refreshRate = 50;
-            clockTicker = tickerTimer.scheduleWithFixedDelay(this,
-                    0, refreshRate, TimeUnit.MILLISECONDS);
+        Log.d(LOG_TAG, "startTick");
+        if (loopThread != null && !loopThread.isAlive()) {
+            try {
+                loopThread.join();
+                loopThread = null;
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
         }
+        running = true;
+        if (loopThread == null) {
+            loopThread = new Thread(() -> {
+                while (running) {
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    updateTime();
+                }
+                loopThread = null;
+            });
+            loopThread.start();
+        }
+//        if (clockTicker == null) {
+//            int refreshRate = 50;
+//            clockTicker = tickerTimer.scheduleWithFixedDelay(this,
+//                    0, refreshRate, TimeUnit.MILLISECONDS);
+//        }
     }
 
     @Override

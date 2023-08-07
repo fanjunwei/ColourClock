@@ -1,22 +1,28 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace 'org.gringene.colourclock'
-    compileSdkVersion 'android-34'
-    buildToolsVersion "20.0.0"
+    namespace 'com.fjw.shiche_clock'
+    compileSdk 34
 
     defaultConfig {
-        applicationId "org.gringene.colourclock"
-        minSdkVersion 16
-        targetSdkVersion 34
-        versionCode 3
-        versionName "1.1.1"
+        applicationId "com.fjw.shiche_clock"
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName "0.1"
     }
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    buildFeatures {
+        viewBinding true
     }
 }
 

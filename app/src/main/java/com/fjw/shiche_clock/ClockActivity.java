@@ -1,4 +1,4 @@
-package org.gringene.colourclock;
+package com.fjw.shiche_clock;
 
 import android.os.Bundle;
 import android.app.Activity;

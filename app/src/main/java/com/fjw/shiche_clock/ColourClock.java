@@ -1,4 +1,4 @@
-package org.gringene.colourclock;
+package com.fjw.shiche_clock;
 
 
 import android.content.Context;
@@ -13,6 +13,8 @@ import android.view.View;
 
 import java.util.Calendar;
 import java.util.Locale;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.locks.ReentrantLock;
 
 enum ClockViewType {
@@ -52,7 +54,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     private Canvas painting;
 
     private boolean running = false;
-    private Thread loopThread = null;
+    private Timer updateTimer = null;
 
 
     private boolean started = false;
@@ -294,7 +296,10 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     public void stopTick() {
         /* try to remove all traces of the update threads and stop them from running */
         Log.d(LOG_TAG, "stopTick");
-        running = false;
+        if (updateTimer != null) {
+            updateTimer.cancel();
+            updateTimer = null;
+        }
 //        clockTicker.cancel(true);
 //        for (Runnable t : tickerTimer.getQueue()) {
 //            tickerTimer.remove(t);
@@ -304,36 +309,24 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
 
     public void startTick() {
         Log.d(LOG_TAG, "startTick");
-        if (loopThread != null && !loopThread.isAlive()) {
-            try {
-                loopThread.join();
-                loopThread = null;
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        running = true;
-        if (loopThread == null) {
-            loopThread = new Thread(() -> {
-                while (running) {
-                    try {
-                        Thread.sleep(50);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
+        if (updateTimer == null) {
+            updateTimer = new Timer();
+            updateTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    if(started){
+                        updateTime();
                     }
-                    updateTime();
                 }
-                loopThread = null;
-            });
-            loopThread.start();
+            }, 50,50);
         }
-//        if (clockTicker == null) {
+    }
+
+    //        if (clockTicker == null) {
 //            int refreshRate = 50;
 //            clockTicker = tickerTimer.scheduleWithFixedDelay(this,
 //                    0, refreshRate, TimeUnit.MILLISECONDS);
 //        }
-    }
-
     @Override
     public void onClick(View view) {
         switch (this.currentViewType) {

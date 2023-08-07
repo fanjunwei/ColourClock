@@ -6,7 +6,7 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     android:paddingBottom="16dp">
 
-    <org.gringene.colourclock.ColourClock
+    <com.fjw.shiche_clock.ColourClock
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:id="@+id/colourClock"

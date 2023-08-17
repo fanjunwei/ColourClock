@@ -26,7 +26,7 @@ enum ClockViewType {
 public class ColourClock extends View implements View.OnClickListener, Runnable {
 
     private final ReentrantLock drawLock = new ReentrantLock();
-    private boolean onDraw = false;
+    private boolean onDrawing = false;
     private boolean dryLock = false;
     private final ReentrantLock drawStateLock = new ReentrantLock();
     private ClockViewType currentViewType = ClockViewType.NORMAL;
@@ -120,8 +120,9 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         brushes.setColor(Color.BLACK);
         Rect b = new Rect();
         int tag_count;
+        ClockViewType currentViewType = this.currentViewType;
 
-        if (this.currentViewType == ClockViewType.NORMAL) {
+        if (currentViewType == ClockViewType.NORMAL) {
             tag_count = 12;
             brushes.setTextSize(bandWidth * 3);
         } else {
@@ -132,7 +133,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             String is = Integer.toString(i);
             brushes.getTextBounds(is, 0, is.length(), b);
             double angle;
-            if (this.currentViewType == ClockViewType.NORMAL) {
+            if (currentViewType == ClockViewType.NORMAL) {
                 angle = (i * 30 - 90) * (Math.PI / 180);
             } else {
                 angle = (i * 60 - 120) * (Math.PI / 180);
@@ -141,7 +142,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             double cy = centreY + Math.sin(angle) * bandWidth * ColourClock.NUMBER_POS + b.height() / 2f;
             String text;
             String[] tl;
-            switch (this.currentViewType) {
+            switch (currentViewType) {
                 case NORMAL:
                 default:
                     text = String.format(Locale.CHINA, "%d", i == 0 ? 12 : i);
@@ -190,11 +191,11 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             return;
         }
         try {
-            onDraw = true;
+            onDrawing = true;
             float hourAng = (mHours * 30); // 360/12
             float minAng = (mMinutes * 6); // 360/60
             float secAng = (mSeconds * 6); // 360/60
-            this.painting.drawColor(Color.WHITE); // fill in background
+//            this.painting.drawColor(Color.WHITE); // fill in background
             brushes.setStyle(Paint.Style.STROKE);
             drawCircle(ColourClock.OUTER_POS, 0.125f, Color.WHITE, Color.BLACK, this.painting); // outer face
             drawCircle(ColourClock.INNER_POS, 0.125f, Color.WHITE, Color.BLACK, this.painting); // inner face
@@ -211,7 +212,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             brushes.setStyle(Paint.Style.FILL);
 
         } finally {
-            onDraw = false;
+            onDrawing = false;
             this.drawLock.unlock();
             this.postInvalidate();
         }
@@ -267,7 +268,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             return;
         }
         try {
-            if (!onDraw) {
+            if (!onDrawing) {
                 canvas.drawBitmap(backing, 0, 0, null);
             } else {
                 this.invalidate();

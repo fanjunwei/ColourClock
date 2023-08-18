@@ -1,6 +1,5 @@
 package com.fjw.shiche_clock;
 
-
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -26,12 +25,13 @@ enum ClockViewType {
 public class ColourClock extends View implements View.OnClickListener, Runnable {
 
     private final ReentrantLock drawLock = new ReentrantLock();
+    private final ReentrantLock copyBitmapLock = new ReentrantLock();
     private boolean onDrawing = false;
     private boolean dryLock = false;
     private final ReentrantLock drawStateLock = new ReentrantLock();
     private ClockViewType currentViewType = ClockViewType.NORMAL;
     private static final String LOG_TAG = "clock_view";
-    private static final float OUTER_POS = 16;  // position of numbers in sixteenths of circle radius
+    private static final float OUTER_POS = 16; // position of numbers in sixteenths of circle radius
     private static final float INNER_POS = 11;
     private static final float NUMBER_POS = (OUTER_POS + INNER_POS) / 2f;
     private static final float SEC_POS = 10;
@@ -41,7 +41,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     private static final float MIN_WIDTH = 0.25f;
     private static final float SEC_WIDTH = 0.125f;
     private final Paint brushes = new Paint(Paint.ANTI_ALIAS_FLAG);
-    //    private Time mCalendar;
+    // private Time mCalendar;
     private float mHours;
     private float mMinutes;
     private float mSeconds;
@@ -51,11 +51,11 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     private float bandWidth;
 
     private Bitmap backing;
+    private Bitmap lastBacking;
     private Canvas painting;
 
     private boolean running = false;
     private Timer updateTimer = null;
-
 
     private boolean started = false;
 
@@ -87,7 +87,8 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         mMinutes = min + mSeconds / 60;
         mHours = hour + mMinutes / 60;
         mMinutes = (float) Math.floor(mMinutes); // now that the Hour is done, ensure minutes jump
-        //Log.d("org.gringene.colourclock",String.format("Updating time, now %02d:%02d:%02.2f", hour, min, mSeconds));
+        // Log.d("org.gringene.colourclock",String.format("Updating time, now
+        // %02d:%02d:%02.2f", hour, min, mSeconds));
         if (started) {
             drawClock();
         }
@@ -111,7 +112,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         } else if ((theta >= 270) && (theta < 360)) {
             h = ((theta - 270) * (120f / 90f)) + 240; // blue to red
         }
-        float[] hsvVals = {(float) h, (float) s, (float) v};
+        float[] hsvVals = { (float) h, (float) s, (float) v };
         return Color.HSVToColor(hsvVals);
     }
 
@@ -148,18 +149,18 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
                     text = String.format(Locale.CHINA, "%d", i == 0 ? 12 : i);
                     break;
                 case SHI_CHEN:
-                    if (mHours < 12) {
-                        tl = new String[]{"子", "丑", "寅", "卯", "辰", "巳"};
+                    if (mHours < 11 || mHours == 23) {
+                        tl = new String[] { "子", "丑", "寅", "卯", "辰", "巳" };
                     } else {
-                        tl = new String[]{"午", "未", "申", "酉", "戌", "亥"};
+                        tl = new String[] { "午", "未", "申", "酉", "戌", "亥" };
                     }
                     text = tl[i];
                     break;
                 case JING_LUO:
-                    if (mHours < 12) {
-                        tl = new String[]{"胆", "肝", "肺", "大肠", "胃", "脾"};
+                    if (mHours < 11 || mHours == 23) {
+                        tl = new String[] { "胆", "肝", "肺", "大肠", "胃", "脾" };
                     } else {
-                        tl = new String[]{"心", "小肠", "膀胱", "肾", "心包", "三焦"};
+                        tl = new String[] { "心", "小肠", "膀胱", "肾", "心包", "三焦" };
                     }
                     text = tl[i];
                     break;
@@ -195,18 +196,21 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             float hourAng = (mHours * 30); // 360/12
             float minAng = (mMinutes * 6); // 360/60
             float secAng = (mSeconds * 6); // 360/60
-//            this.painting.drawColor(Color.WHITE); // fill in background
+            // this.painting.drawColor(Color.WHITE); // fill in background
             brushes.setStyle(Paint.Style.STROKE);
             drawCircle(ColourClock.OUTER_POS, 0.125f, Color.WHITE, Color.BLACK, this.painting); // outer face
             drawCircle(ColourClock.INNER_POS, 0.125f, Color.WHITE, Color.BLACK, this.painting); // inner face
             drawNumbers(this.painting);
             brushes.setStyle(Paint.Style.STROKE);
             drawLine(hourAng, ColourClock.HOUR_POS, ColourClock.HOUR_WIDTH, this.painting); // hour hand
-            drawCircle(hourAng, ColourClock.HOUR_POS - 2, 1.5f, ColourClock.HOUR_WIDTH, getAngleColour(hourAng), Color.BLACK, this.painting); // hour circle
+            drawCircle(hourAng, ColourClock.HOUR_POS - 2, 1.5f, ColourClock.HOUR_WIDTH, getAngleColour(hourAng),
+                    Color.BLACK, this.painting); // hour circle
             drawLine(minAng, ColourClock.MIN_POS, ColourClock.MIN_WIDTH, this.painting); // minute hand
-            drawCircle(minAng, ColourClock.MIN_POS - 1.25f, 1f, ColourClock.MIN_WIDTH, getAngleColour(minAng), Color.BLACK, this.painting); // minute circle
+            drawCircle(minAng, ColourClock.MIN_POS - 1.25f, 1f, ColourClock.MIN_WIDTH, getAngleColour(minAng),
+                    Color.BLACK, this.painting); // minute circle
             drawLine(secAng, ColourClock.SEC_POS, ColourClock.SEC_WIDTH, this.painting); // second hand
-            drawCircle(secAng, ColourClock.SEC_POS - 0.75f, 0.5f, ColourClock.SEC_WIDTH, getAngleColour(secAng), Color.BLACK, this.painting); // second circle
+            drawCircle(secAng, ColourClock.SEC_POS - 0.75f, 0.5f, ColourClock.SEC_WIDTH, getAngleColour(secAng),
+                    Color.BLACK, this.painting); // second circle
             drawCircle(2, 0.5f, Color.WHITE, Color.BLACK, this.painting); // centre dot
             brushes.setStrokeWidth(1);
             brushes.setStyle(Paint.Style.FILL);
@@ -214,8 +218,11 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         } finally {
             onDrawing = false;
             this.drawLock.unlock();
-            this.postInvalidate();
         }
+        this.copyBitmapLock.lock();
+        lastBacking = backing.copy(Bitmap.Config.ARGB_8888, true);
+        this.copyBitmapLock.unlock();
+        this.postInvalidate();
         this.drawStateLock.lock();
         if (this.dryLock) {
             Thread t = new Thread(this);
@@ -226,7 +233,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     }
 
     private void drawCircle(float radiusFactor, float strokeWFactor,
-                            int fillCol, int strokeCol, Canvas tPainting) {
+            int fillCol, int strokeCol, Canvas tPainting) {
         brushes.setStrokeWidth(strokeWFactor * bandWidth);
         brushes.setColor(fillCol);
         brushes.setStyle(Paint.Style.FILL);
@@ -237,7 +244,7 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     }
 
     private void drawCircle(float angle, float lengthFactor, float radiusFactor, float strokeWFactor,
-                            int fillCol, int strokeCol, Canvas tPainting) {
+            int fillCol, int strokeCol, Canvas tPainting) {
         angle = (float) ((angle - 90) * Math.PI / 180);
         double cx = centreX + Math.cos(angle) * lengthFactor * bandWidth;
         double cy = centreY + Math.sin(angle) * lengthFactor * bandWidth;
@@ -263,19 +270,14 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
     @Override
     public void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (!this.drawLock.tryLock()) {
+        this.copyBitmapLock.lock();
+        if (this.lastBacking == null) {
             this.invalidate();
-            return;
+        } else {
+
+            canvas.drawBitmap(this.lastBacking, 0, 0, null);
         }
-        try {
-            if (!onDrawing) {
-                canvas.drawBitmap(backing, 0, 0, null);
-            } else {
-                this.invalidate();
-            }
-        } finally {
-            this.drawLock.unlock();
-        }
+        this.copyBitmapLock.unlock();
     }
 
     public void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
@@ -301,11 +303,11 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             updateTimer.cancel();
             updateTimer = null;
         }
-//        clockTicker.cancel(true);
-//        for (Runnable t : tickerTimer.getQueue()) {
-//            tickerTimer.remove(t);
-//        }
-//        clockTicker = null;
+        // clockTicker.cancel(true);
+        // for (Runnable t : tickerTimer.getQueue()) {
+        // tickerTimer.remove(t);
+        // }
+        // clockTicker = null;
     }
 
     public void startTick() {
@@ -315,19 +317,19 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             updateTimer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    if(started){
+                    if (started) {
                         updateTime();
                     }
                 }
-            }, 50,50);
+            }, 50, 50);
         }
     }
 
-    //        if (clockTicker == null) {
-//            int refreshRate = 50;
-//            clockTicker = tickerTimer.scheduleWithFixedDelay(this,
-//                    0, refreshRate, TimeUnit.MILLISECONDS);
-//        }
+    // if (clockTicker == null) {
+    // int refreshRate = 50;
+    // clockTicker = tickerTimer.scheduleWithFixedDelay(this,
+    // 0, refreshRate, TimeUnit.MILLISECONDS);
+    // }
     @Override
     public void onClick(View view) {
         switch (this.currentViewType) {

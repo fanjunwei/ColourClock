@@ -84,9 +84,9 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         float mSecFrac = (currentMillis % 1000) / 1000f;
         mSecFrac = (float) (1 - Math.sin((0.5f - mSecFrac) * Math.PI)) / 2;
         mSeconds = secInt + mSecFrac;
-        mMinutes = min + mSeconds / 60;
+        mMinutes = (float)min;
         mHours = hour + mMinutes / 60;
-        mMinutes = (float) Math.floor(mMinutes); // now that the Hour is done, ensure minutes jump
+        // mMinutes = (float) Math.floor(mMinutes); // now that the Hour is done, ensure minutes jump
         // Log.d("org.gringene.colourclock",String.format("Updating time, now
         // %02d:%02d:%02.2f", hour, min, mSeconds));
         if (started) {
@@ -131,16 +131,19 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
             brushes.setTextSize(bandWidth * 2);
         }
         for (int i = 0; i < tag_count; i++) {
+            tPainting.save();
             String is = Integer.toString(i);
             brushes.getTextBounds(is, 0, is.length(), b);
-            double angle;
+            float angle;
             if (currentViewType == ClockViewType.NORMAL) {
-                angle = (i * 30 - 90) * (Math.PI / 180);
+                angle = i * 30;
             } else {
-                angle = (i * 60 - 120) * (Math.PI / 180);
+                angle = i * 60 - 30;
             }
-            double cx = centreX + Math.cos(angle) * bandWidth * ColourClock.NUMBER_POS;
-            double cy = centreY + Math.sin(angle) * bandWidth * ColourClock.NUMBER_POS + b.height() / 2f;
+            tPainting.rotate(angle, centreX, centreY);
+            double cx = centreX;
+            double cy = centreY - bandWidth * ColourClock.NUMBER_POS + b.height() / 2f;
+            double ccy = centreY - bandWidth * ColourClock.NUMBER_POS;
             String text;
             String[] tl;
             switch (currentViewType) {
@@ -165,26 +168,32 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
                     text = tl[i];
                     break;
             }
+            tPainting.rotate(-angle, (float) cx, (float) ccy);
             tPainting.drawText(text, (float) cx, (float) cy, brushes);
+            tPainting.restore();
         }
         for (int i = 0; i < 60; i++) {
-            double angle = (i * 6 - 90) * (Math.PI / 180);
+            tPainting.save();
+            float angle = i * 6 - 90;
+            tPainting.rotate(angle, centreX, centreY);
             double tel = bandWidth / 3;
             double tsl = (i % 5 == 0) ? bandWidth : bandWidth / 2f;
-            double tsx = centreX + Math.cos(angle) * (bandWidth * ColourClock.INNER_POS - tel - tsl);
-            double tex = centreX + Math.cos(angle) * (bandWidth * ColourClock.INNER_POS - tel);
-            double tsy = centreY + Math.sin(angle) * (bandWidth * ColourClock.INNER_POS - tel - tsl);
-            double tey = centreY + Math.sin(angle) * (bandWidth * ColourClock.INNER_POS - tel);
+            double tsx = centreX;
+            double tex = centreX;
+            double tsy = centreY - (bandWidth * ColourClock.INNER_POS - tel - tsl);
+            double tey = centreY - (bandWidth * ColourClock.INNER_POS - tel);
             if (i % 5 == 0) {
                 brushes.setStrokeWidth(bandWidth * ColourClock.MIN_WIDTH * 0.75f);
             } else {
                 brushes.setStrokeWidth(bandWidth * ColourClock.SEC_WIDTH * 0.75f);
             }
             tPainting.drawLine((float) tsx, (float) tsy, (float) tex, (float) tey, brushes);
+            tPainting.restore();
         }
     }
 
     public void drawClock() {
+        long startTime = System.currentTimeMillis();
         if (!this.drawLock.tryLock()) {
             this.drawStateLock.lock();
             this.dryLock = true;
@@ -222,6 +231,8 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         this.copyBitmapLock.lock();
         lastBacking = backing.copy(Bitmap.Config.ARGB_8888, true);
         this.copyBitmapLock.unlock();
+        long endTime = System.currentTimeMillis();
+        Log.d(LOG_TAG, "Time to draw: " + (endTime - startTime) + "ms");
         this.postInvalidate();
         this.drawStateLock.lock();
         if (this.dryLock) {
@@ -245,9 +256,10 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
 
     private void drawCircle(float angle, float lengthFactor, float radiusFactor, float strokeWFactor,
             int fillCol, int strokeCol, Canvas tPainting) {
-        angle = (float) ((angle - 90) * Math.PI / 180);
-        double cx = centreX + Math.cos(angle) * lengthFactor * bandWidth;
-        double cy = centreY + Math.sin(angle) * lengthFactor * bandWidth;
+        tPainting.save();
+        tPainting.rotate(angle, centreX, centreY);
+        double cx = centreX;
+        double cy = centreY - lengthFactor * bandWidth;
         brushes.setStrokeWidth(bandWidth * strokeWFactor);
         brushes.setStrokeWidth(strokeWFactor * bandWidth);
         brushes.setColor(fillCol);
@@ -256,15 +268,17 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         brushes.setColor(strokeCol);
         brushes.setStyle(Paint.Style.STROKE);
         tPainting.drawCircle((float) cx, (float) cy, radiusFactor * bandWidth, brushes);
-
+        tPainting.restore();
     }
 
     private void drawLine(float angle, float lengthFactor, float widthFactor, Canvas tPainting) {
-        angle = (float) ((angle - 90) * Math.PI / 180);
+        tPainting.save();
+        tPainting.rotate(angle, centreX, centreY);
         brushes.setStrokeWidth(bandWidth * widthFactor);
         tPainting.drawLine(centreX, centreY,
-                (float) (centreX + Math.cos(angle) * bandWidth * lengthFactor),
-                (float) (centreY + Math.sin(angle) * bandWidth * lengthFactor), brushes);
+                (float) (centreX),
+                (float) (centreY - bandWidth * lengthFactor), brushes);
+        tPainting.restore();
     }
 
     @Override

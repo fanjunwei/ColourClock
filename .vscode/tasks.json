@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "gradle",
+			"id": "/Users/fanjunwei/AndroidStudioProjects/ColourClockapp:buildapp",
+			"script": "app:build",
+			"description": "Assembles and tests this project.",
+			"group": "build",
+			"project": "app",
+			"buildFile": "/Users/fanjunwei/AndroidStudioProjects/ColourClock/app/build.gradle",
+			"rootProject": "ColourClock",
+			"projectFolder": "/Users/fanjunwei/AndroidStudioProjects/ColourClock",
+			"workspaceFolder": "/Users/fanjunwei/AndroidStudioProjects/ColourClock",
+			"args": "",
+			"javaDebug": false,
+			"problemMatcher": [
+				"$gradle"
+			],
+			"label": "gradle: app:build"
+		}
+	]
+}

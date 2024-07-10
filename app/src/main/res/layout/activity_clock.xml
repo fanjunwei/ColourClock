@@ -5,11 +5,11 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
     android:paddingBottom="16dp">
-
+    
     <com.fjw.shiche_clock.ColourClock
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:id="@+id/colourClock"
+        android:id="@+id/shiche_clock"
         android:layout_centerVertical="true"
         android:layout_centerHorizontal="true" />
 </RelativeLayout>

@@ -9,8 +9,8 @@ public class ClockActivity extends Activity {
     ColourClock mClock;
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mClock = new ColourClock(this);
-        setContentView(mClock);
+        setContentView(R.layout.activity_clock);
+        mClock = (ColourClock) findViewById(R.id.shiche_clock);
     }
 
     @Override

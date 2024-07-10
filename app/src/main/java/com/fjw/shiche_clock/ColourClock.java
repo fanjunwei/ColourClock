@@ -63,6 +63,11 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         super(context);
         init();
     }
+    
+    public ColourClock(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
 
     public ColourClock(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -84,9 +89,10 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
         float mSecFrac = (currentMillis % 1000) / 1000f;
         mSecFrac = (float) (1 - Math.sin((0.5f - mSecFrac) * Math.PI)) / 2;
         mSeconds = secInt + mSecFrac;
-        mMinutes = (float)min;
+        mMinutes = (float) min;
         mHours = hour + mMinutes / 60;
-        // mMinutes = (float) Math.floor(mMinutes); // now that the Hour is done, ensure minutes jump
+        // mMinutes = (float) Math.floor(mMinutes); // now that the Hour is done, ensure
+        // minutes jump
         // Log.d("org.gringene.colourclock",String.format("Updating time, now
         // %02d:%02d:%02.2f", hour, min, mSeconds));
         if (started) {
@@ -168,6 +174,9 @@ public class ColourClock extends View implements View.OnClickListener, Runnable 
                     text = tl[i];
                     break;
             }
+            // float clockRadius = Math.min(width - 16, height - 16) / 2f;
+            // tPainting.drawArc(centreX, centreY, clockRadius * 2f, clockRadius * 2f, 360 -
+            // angle, angle, true, brushes);
             tPainting.rotate(-angle, (float) cx, (float) ccy);
             tPainting.drawText(text, (float) cx, (float) cy, brushes);
             tPainting.restore();
